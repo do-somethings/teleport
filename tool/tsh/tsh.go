@@ -359,20 +359,20 @@ func onLogin(cf *CLIConf) {
 		utils.FatalError(err)
 	}
 
-	// client is already logged in and profile is not expired
+	// Client is already logged in and profile is not expired.
 	if profile != nil && !profile.IsExpired(clockwork.NewRealClock()) {
 		switch {
-		// in case if nothing is specified, print current status
+		// In case if nothing is specified, print current status.
 		case cf.Proxy == "" && cf.SiteName == "":
 			printProfiles(profile, profiles)
 			return
-			// in case if parameters match, print current status
+		// In case if parameters match, print current status.
 		case host(cf.Proxy) == host(profile.ProxyURL.Host) && cf.SiteName == profile.Cluster:
 			printProfiles(profile, profiles)
 			return
-			// proxy is unspecified or the same as the currently provided proxy,
-			// but cluster is specified, treat this as selecting a new cluster
-			// for the same proxy
+		// Proxy is unspecified or the same as the currently provided proxy,
+		// but cluster is specified, treat this as selecting a new cluster
+		// for the same proxy.
 		case (cf.Proxy == "" || host(cf.Proxy) == host(profile.ProxyURL.Host)) && cf.SiteName != "":
 			tc.SaveProfile("")
 			if err := kubeclient.UpdateKubeconfig(tc); err != nil {
@@ -380,7 +380,7 @@ func onLogin(cf *CLIConf) {
 			}
 			onStatus(cf)
 			return
-			// otherwise just passthrough to standard login
+		// Otherwise just passthrough to standard login.
 		default:
 		}
 	}
@@ -396,31 +396,33 @@ func onLogin(cf *CLIConf) {
 	if key, err = tc.Login(cf.Context, activateKey); err != nil {
 		utils.FatalError(err)
 	}
+
+	// Update the command line flag for proxy. This is to make sure that status
+	// is printed correctly (which only works with command line flags). This
+	// makes sure if the proxy has a public address set, it will get set here.
+	cf.Proxy = tc.ProxyHost()
+
 	if makeIdentityFile {
 		client.MakeIdentityFile(cf.IdentityFileOut, key, cf.IdentityFormat)
 		fmt.Printf("\nThe certificate has been written to %s\n", cf.IdentityFileOut)
 		return
 	}
 
-	// update kubernetes config file
+	// Update kubernetes config file.
 	if err := kubeclient.UpdateKubeconfig(tc); err != nil {
 		utils.FatalError(err)
 	}
 
-	// regular login (without -i flag)
+	// Regular login without -i flag.
 	tc.SaveProfile("")
 
-	// Make the client again (this way it will pick up the updated profile) and
-	// then update the known hosts file.
-	tc, err = makeClient(cf, true)
-	if err != nil {
-		utils.FatalError(err)
-	}
+	// Connect to the Auth Server and fetch the known hosts for this cluster.
 	err = tc.UpdateKnownHosts(cf.Context)
 	if err != nil {
 		utils.FatalError(err)
 	}
 
+	// Print status to show information of the logged in user.
 	onStatus(cf)
 }
 
